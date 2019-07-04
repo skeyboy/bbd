@@ -19,9 +19,16 @@ func main() {
 		})
 		w.Flush()
 	*/
-	v := make(chan bool)
-	go bilibili.Bilibili(1, "雄兵连")
-	go bilibili.Bilibili(1, "斗罗大陆")
-	<-v
-	close(v)
+	keywords := []string{"斗罗大陆", "斗破苍穹", "魔道祖师"}
+
+	v := make(chan bool, len(keywords))
+	defer close(v)
+	for _, value := range keywords {
+		keyword := value
+		go bilibili.Bilibili(1, keyword, v)
+
+	}
+	for i := 0; i < cap(v); i++ {
+		<-v
+	}
 }

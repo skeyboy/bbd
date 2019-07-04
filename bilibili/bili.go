@@ -101,9 +101,9 @@ func start(page int, keyword string, mark *chan bool) {
 	//cc.Visit("https://github.com/golang/text")
 	cc.Wait()
 }
-func Bilibili(page int, keyword string) {
-	v := make(chan bool)
+func Bilibili(page int, keyword string, v chan bool) {
+	//v := make(chan bool)
 	go start(page, keyword, &v)
-	<-v
-	close(v)
+	//<-v
+	//close(v)
 }
