@@ -19,7 +19,7 @@ func main() {
 		})
 		w.Flush()
 	*/
-	keywords := []string{"斗罗大陆", "斗破苍穹", "魔道祖师"}
+	keywords := []string{"豫剧", "斗罗大陆", "斗破苍穹", "魔道祖师"}
 
 	v := make(chan bool, len(keywords))
 	defer close(v)

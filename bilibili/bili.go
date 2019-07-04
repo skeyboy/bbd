@@ -9,12 +9,23 @@ import (
 	"sync"
 )
 
+//打开对应的详情 并解析出详情所在专辑中的详细视频列表
+
 func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 	c.OnHTML("html", func(element *colly.HTMLElement) {
 		result := regexp.MustCompile("video_url: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
-			fmt.Println(string(value))
+			fmt.Println("视频地址：", string(value))
 		}
+		result = regexp.MustCompile("image: '(.*?)'").FindAll([]byte(element.Text), -1)
+		for _, value := range result {
+			fmt.Println("图像封面：", string(value))
+		}
+		result = regexp.MustCompile("window.__INITIAL_STATE__={(.*?)};").FindAll([]byte(element.Text), -1)
+		for _, value := range result {
+			fmt.Println("专辑详情：", string(value))
+		}
+
 		wg.Done()
 	})
 	c.OnError(func(response *colly.Response, e error) {
