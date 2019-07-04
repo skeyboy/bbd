@@ -31,6 +31,12 @@ func engineerSearch(url string, search *Search, c *colly.Collector, callback fun
 		request.Method = "POST"
 
 	})
+	c.OnError(func(response *colly.Response, e error) {
+		if e != nil {
+			fmt.Println("⚠️", e.Error(), response.Request)
+			finished()
+		}
+	})
 	c.OnResponse(func(response *colly.Response) {
 		//fmt.Println(string(response.Body))
 		var searchResult = SearchResult{}
@@ -38,7 +44,6 @@ func engineerSearch(url string, search *Search, c *colly.Collector, callback fun
 		if e != nil {
 			fmt.Println("❌")
 			finished()
-			return
 		}
 		if searchResult.IsSuccess() {
 			callback(search.Page+1, &searchResult)
@@ -55,10 +60,10 @@ func engineerSearch(url string, search *Search, c *colly.Collector, callback fun
 
 	}
 	c.PostRaw(url, js)
-	c.Wait()
+	//c.Wait()
 }
 
-func start(page int, keyword string, mark chan bool) {
+func start(page int, keyword string, mark *chan bool) {
 	c := colly.NewCollector(func(collector *colly.Collector) {
 		collector.IgnoreRobotsTxt = true
 		collector.Async = true
@@ -89,7 +94,7 @@ func start(page int, keyword string, mark chan bool) {
 		//<-v
 		//close(v)
 		//os.Exit(0)
-		mark <- true
+		*mark <- true
 	})
 	//<-v
 
@@ -98,7 +103,7 @@ func start(page int, keyword string, mark chan bool) {
 }
 func Bilibili(page int, keyword string) {
 	v := make(chan bool)
-	go start(page, keyword, v)
+	go start(page, keyword, &v)
 	<-v
 	close(v)
 }

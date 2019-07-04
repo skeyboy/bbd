@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bbd/bilibili"
+	"./bilibili"
 )
 
 func main() {
