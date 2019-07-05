@@ -1,153 +1,29 @@
 package bilibili
 
 import (
+	"../dyproxy"
 	"encoding/json"
 	"fmt"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/proxy"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
-	"strings"
 	"sync"
-	"time"
 )
 
-type ProxyIp struct {
-	Ip                      string
-	Port                    int
-	IsHttps                 bool
-	UpdateTime              int
-	SourceUrl               string
-	TimeTolive              int
-	AnonymousInfo           string
-	Area                    string
-	InternetServiceProvider string
-	Life                    string
-}
-
-var ProxyIpPool []ProxyIp
-
 func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
-	p := &ProxyIpPool
-	SourceUrl := "http://www.xicidaili.com/nt/"
-	// Instantiate default collector
-	//c := colly.NewCollector(
-	//	// MaxDepth is 2, so only the links on the scraped page
-	//	// and links on those pages are visited
-	//	colly.MaxDepth(1),
-	//	colly.Async(true),
-	//)
 
-	// Limit the maximum parallelism to 1
-	// This is necessary if the goroutines are dynamically
-	// created to control the limit of simultaneous requests.
-	//
-	// Parallelism can be controlled also by spawning fixed
-	// number of go routines.
-	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 12})
-
-	// On every a element which has href attribute call callback
-	c.OnHTML("tr", func(e *colly.HTMLElement) {
-		var item ProxyIp
-		e.ForEach("td", func(i int, element *colly.HTMLElement) {
-			t := element.Text
-			switch i {
-			case 1:
-				item.Ip = t
-				break
-			case 2:
-				p, n := strconv.Atoi(t)
-				if n == nil {
-					item.Port = p
-				}
-				break
-			case 3:
-				item.Area = t
-				break
-			case 4:
-				//是否匿名
-
-			case 5:
-				item.IsHttps = strings.Contains(strings.ToLower(t), "https")
-				break
-
-			case 6:
-				break
-			case 8:
-				//存活时间 分钟/小时/天
-				item.Life = t
-				break
-			case 9:
-				//验证时间
-
-				break
-
-			default:
-				break
-			}
-
-		})
-		item.SourceUrl = SourceUrl
-		if len(item.Ip) > 10 && (strings.Contains(item.Life, "天") || strings.Contains(item.Life, "小时")) {
-			*p = append(*p, item)
-		}
-	})
-
-	// Start scraping on https://en.wikipedia.org
-	c.Visit(SourceUrl)
-	// Wait until threads are finished
-	c.Wait()
-
-	fmt.Println(*p)
-	fmt.Println("fmt.Println(*p)----------------------------------->")
-
-	var a []string
-	for _, v := range *p {
-		http := "http"
-		if v.IsHttps {
-			http = "https"
-		}
-		if v.Ip != "" && v.Port != 0 && v.IsHttps {
-			s := http + "://" + v.Ip + ":" + strconv.Itoa(v.Port)
-			fmt.Println(s, "\t", v)
-			if len(v.Ip) > 10 {
-
-				a = append(a, s)
-			}
-		}
-	}
-
-	fmt.Println("fmt.Println(*p)<-----------------------------------")
-
-	/*
-		c = colly.NewCollector(
-			colly.AllowedDomains("cn.sonhoo.com"),
-		)*/
+	var pool = dyproxy.AllProxy()
 
 	var wg sync.WaitGroup
-
-	for _, v := range ProxyIpPool {
-		wg.Add(1)
-
-		http := "http"
-		if v.IsHttps {
-			http = "https"
-		}
-		if v.Ip != "" && v.Port != 0 && v.IsHttps {
-			s := http + "://" + v.Ip + ":" + strconv.Itoa(v.Port)
-			fmt.Println(s, "\t", v)
-			if len(v.Ip) > 10 {
-
-				ip, code := ProxyThorn(s, &wg)
-				fmt.Println("可用IP", ip, "\t", code)
-			}
-		}
+	a := []string{}
+	for _, v := range pool {
+		v := v
+		fmt.Println("可用IP", v)
+		a = append(a, "//"+v.FullIp())
 
 	}
+
 	wg.Wait()
 	rp, err := proxy.RoundRobinProxySwitcher(a...)
 	/*
@@ -161,43 +37,6 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 	return rp, err
 }
 
-func ProxyThorn(proxy_addr string, wg *sync.WaitGroup) (ip string, status int) {
-	//访问查看ip的一个网址
-	httpUrl := "http://icanhazip.com"
-	proxy, err := url.Parse(proxy_addr)
-
-	netTransport := &http.Transport{
-		Proxy:                 http.ProxyURL(proxy),
-		MaxIdleConnsPerHost:   10,
-		ResponseHeaderTimeout: time.Second * time.Duration(5),
-	}
-	httpClient := &http.Client{
-		Timeout:   time.Second * 10,
-		Transport: netTransport,
-	}
-	res, err := httpClient.Get(httpUrl)
-	if err != nil {
-		fmt.Println("错误信息：", err)
-		return
-	}
-	defer res.Body.Close()
-	defer wg.Done()
-	if res.StatusCode != http.StatusOK {
-		log.Println(err)
-		return
-	}
-	c, _ := ioutil.ReadAll(res.Body)
-	return string(c), res.StatusCode
-}
-
-/*
----------------------
-作者：Liu-YanLin
-来源：CSDN
-原文：https://blog.csdn.net/qq_32502511/article/details/90044202
-版权声明：本文为博主原创文章，转载请附上博文链接！
-*/
-
 /**
 up主提交的所有视频
 */
@@ -209,7 +48,7 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 		fmt.Println(video.Mid, ":up主的视频专辑:", js, tmpVideo)
 	})
 	c.OnError(func(response *colly.Response, e error) {
-		fmt.Println("❌", e.Error())
+		fmt.Println("❌", e.Error(), string(response.Body))
 	})
 	c.Visit(video.UpSubmitVideosAPI())
 }
@@ -252,7 +91,7 @@ func engineerSearch(url string, search *Search, c *colly.Collector, callback fun
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		if e != nil {
-			fmt.Println("⚠️", e.Error(), response.Request)
+			fmt.Println("⚠️", e.Error(), string(response.Body))
 			finished()
 		}
 	})
