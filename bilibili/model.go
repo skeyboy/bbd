@@ -1,5 +1,7 @@
 package bilibili
 
+import "strconv"
+
 /*
 {"keyword":"yuju"
 ,"page":2,
@@ -36,11 +38,45 @@ type Result struct {
 	Video []Video `json:"video"`
 }
 type Video struct {
-	Tag         string  `json:"tag"`
-	Id          float64 `json:"id"`
-	Title       string  `json:"title"`
-	Mid         float64 `json:"mid"`
-	Pic         string  `json:"pic"`
-	Description string  `json:"description"`
-	Arcurl      string  `json:"arcurl"`
+	Tag         string `json:"tag"`
+	Id          int64  `json:"id"`
+	Title       string `json:"title"`
+	Mid         int64  `json:"mid"` //up主id
+	Pic         string `json:"pic"`
+	Description string `json:"description"`
+	Arcurl      string `json:"arcurl"`
+	Aid         int64  `json:"aid"`
+}
+
+func (v *Video) aIdString() string {
+	return strconv.FormatInt(v.Aid, 10)
+}
+func (v *Video) mIdString() string {
+	//https://space.bilibili.com/95147200
+	return strconv.FormatInt(v.Mid, 10)
+}
+
+/**
+对应up主的主页
+*/
+func (v *Video) UpHome() string {
+	return "https://space.bilibili.com/" + v.mIdString()
+}
+
+/*
+对应Up主提交的视频列表API默认请求地址
+*/
+func (v *Video) UpSubmitVideosAPI() string {
+	/*
+	   https://space.bilibili.com/ajax/member/getSubmitVideos?mid=331734497&pagesize=100&tid=0&page=1&keyword=&order=pubdate
+	*/
+	return "https://space.bilibili.com/ajax/member/getSubmitVideos?mid=" + v.mIdString() + "&pagesize=100&tid=0&page=1&keyword=&order=pubdate"
+}
+
+//视频详情
+func (v *Video) VideoHome() string {
+	return "https://m.bilibili.com/video/av" + v.aIdString() + ".html"
+}
+func (v Video) String() string {
+	return "\nup主页面：" + v.UpHome() + "\n" + "up主视频列表：" + v.UpSubmitVideosAPI() + "\nup某一视频：" + v.VideoHome() + "\n"
 }

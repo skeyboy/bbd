@@ -5,6 +5,7 @@ import (
 )
 
 func main() {
+
 	/*
 		f, e := os.Create("./bilibili/bi.txt")
 		defer f.Close()
@@ -19,7 +20,7 @@ func main() {
 		})
 		w.Flush()
 	*/
-	keywords := []string{"豫剧", "斗罗大陆", "斗破苍穹", "魔道祖师"}
+	keywords := []string{"豫剧"}
 
 	v := make(chan bool, len(keywords))
 	defer close(v)

@@ -9,10 +9,28 @@ import (
 	"sync"
 )
 
-//打开对应的详情 并解析出详情所在专辑中的详细视频列表
+/**
+up主提交的所有视频
+*/
+func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
+	defer wg.Done()
+	tmpVideo := video
+	c.OnResponse(func(response *colly.Response) {
+		js := string(response.Body)
+		fmt.Println(video.Mid, ":up主的视频专辑:", js, tmpVideo)
+	})
+	c.OnError(func(response *colly.Response, e error) {
+		fmt.Println("❌", e.Error())
+	})
+	c.Visit(video.UpSubmitVideosAPI())
+}
+
+//打开某一视频 并解析出详情所在专辑中的详细视频列表
 
 func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
+	tmpVide := video
 	c.OnHTML("html", func(element *colly.HTMLElement) {
+		fmt.Println(tmpVide)
 		result := regexp.MustCompile("video_url: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
 			fmt.Println("视频地址：", string(value))
@@ -26,13 +44,14 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 			fmt.Println("专辑详情：", string(value))
 		}
 
-		wg.Done()
+		//wg.Done()
+		openUpSubmitVideosFrom(tmpVide, c.Clone(), wg)
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		fmt.Println(e.Error())
 		wg.Done()
 	})
-	c.Visit(video.Arcurl)
+	c.Visit(video.VideoHome())
 }
 
 func engineerSearch(url string, search *Search, c *colly.Collector, callback func(page int, result *SearchResult), finished func()) {
@@ -83,6 +102,7 @@ func start(page int, keyword string, mark *chan bool) {
 	cc := c.Clone()
 
 	cc.OnResponse(func(response *colly.Response) {
+		//关闭其实页面结果
 		fmt.Print(response)
 	})
 	search := Search{Keyword: url.QueryEscape(keyword), Order: "totalrank", Main_ver: "v3", Page: page, Bangumi_num: 3, Movie_num: 3}
@@ -90,7 +110,8 @@ func start(page int, keyword string, mark *chan bool) {
 	//v := make(chan bool)
 
 	go engineerSearch(url, &search, cc.Clone(), func(p int, result *SearchResult) {
-		fmt.Println(result.Page, "/t", result)
+		//关闭关键词搜索🔍结果log展示
+		//fmt.Println(result.Page, "/t", result)
 		var wg sync.WaitGroup
 		wg.Add(len(result.Result.Video))
 		for _, video := range result.Result.Video {
