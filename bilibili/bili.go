@@ -65,8 +65,7 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 
 	wg.Wait()
 	rp, err := proxy.RoundRobinProxySwitcher(
-		"//156.235.194.213:8080", "//207.154.200.199:3128", "//138.201.223.250:31288",
-		"//201.217.247.101:80",
+		"//156.235.194.213:8080", "47.52.27.97:31280",
 	)
 	/*
 		if err != nil {
@@ -93,7 +92,11 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 		var topic = Topic{}
 		json.Unmarshal(response.Body, &topic)
 
+		//视频类表下的专辑解析
+		var albumWg sync.WaitGroup
+
 		for _, tv := range topic.TopicData.TopicVideo {
+			albumWg.Add(1)
 			tv := tv
 			res, e := insertTopic(tv, db)
 			if e != nil {
@@ -103,10 +106,19 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 
 				fmt.Println("插入主题", r)
 			}
+			go openAlbum(tv.Aid, c.Clone(), func() {
+				fmt.Println("专辑完成…")
+				albumWg.Done()
+			}, func(err error) {
+				fmt.Println("专辑失败", err.Error())
+				albumWg.Done()
+			})
 		}
-		db.Close()
 
-		wg.Done()
+		db.Close()
+		albumWg.Wait() //专辑完成
+
+		wg.Done() //外层的🔐
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		fmt.Println("❌", e.Error(), string(response.Body))
@@ -115,12 +127,8 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 	c.Visit(video.UpSubmitVideosAPI())
 }
 
-//打开某一视频 并解析出详情所在专辑中的详细视频列表
-
-func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
-	tmpVide := video
+func openAlbum(aid int64, c *colly.Collector, success func(), onError func(err error)) {
 	c.OnHTML("html", func(element *colly.HTMLElement) {
-		fmt.Println(tmpVide)
 		result := regexp.MustCompile("video_url: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
 			fmt.Println("视频地址：", string(value))
@@ -164,12 +172,26 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 			}
 
 		}
+		success()
+	})
+	c.OnError(func(response *colly.Response, e error) {
+		onError(e)
+	})
+	c.Visit("https://m.bilibili.com/video/av" + convert(aid) + ".html")
+}
+
+//打开某一视频 并解析出详情所在专辑中的详细视频列表
+
+func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
+	tmpVide := video
+	openAlbum(video.Aid, c.Clone(), func() {
 		dbResult, db := OpenDB()
 		if dbResult {
 			res, err := insertUpToDB(db, video.mIdString())
 			if err != nil {
 				fmt.Println("插入数据失败", err.Error())
 				db.Close()
+				wg.Done()
 			} else {
 				id, _ := res.LastInsertId()
 
@@ -177,14 +199,82 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 				openUpSubmitVideosFrom(tmpVide, c.Clone(), wg, db)
 			}
 
+		} else {
+			wg.Done()
 		}
-		//wg.Done()
-	})
-	c.OnError(func(response *colly.Response, e error) {
-		fmt.Println(e.Error())
+	}, func(err error) {
+		fmt.Println(err.Error())
 		wg.Done()
 	})
-	c.Visit(video.VideoHome())
+	/*
+		c.OnHTML("html", func(element *colly.HTMLElement) {
+			fmt.Println(tmpVide)
+			result := regexp.MustCompile("video_url: '(.*?)'").FindAll([]byte(element.Text), -1)
+			for _, value := range result {
+				fmt.Println("视频地址：", string(value))
+			}
+			result = regexp.MustCompile("image: '(.*?)'").FindAll([]byte(element.Text), -1)
+			for _, value := range result {
+				fmt.Println("图像封面：", string(value))
+			}
+			result = regexp.MustCompile("window.__INITIAL_STATE__={(.*?)};").FindAll([]byte(element.Text), -1)
+
+			for _, value := range result {
+
+				dbResult, db := OpenDB()
+
+				info := string(value)
+
+				info = strings.ReplaceAll(info, "window.__INITIAL_STATE__=", "")
+				info = strings.ReplaceAll(info, ";", "")
+				fmt.Println("专辑详情：", info)
+
+				var album = Album{}
+				json.Unmarshal([]byte(info), &album)
+
+				if dbResult {
+					stmt, e := db.Prepare("insert into bbd_album(aid,videos,title,state,originTitle,origin) value(?,?,?,?,?,?)")
+					if e != nil {
+						db.Close()
+					} else {
+						origin := info
+						info := album.AlbumContext.AlbumInfo
+
+						res, e := stmt.Exec(info.Aid, info.Videos, info.Title, info.State, info.OriginTitle, origin)
+						if e != nil {
+							fmt.Println(e.Error())
+						} else {
+							r, _ := res.LastInsertId()
+							fmt.Println("专辑插入成功", r)
+						}
+						db.Close()
+					}
+				}
+
+			}
+			dbResult, db := OpenDB()
+			if dbResult {
+				res, err := insertUpToDB(db, video.mIdString())
+				if err != nil {
+					fmt.Println("插入数据失败", err.Error())
+					db.Close()
+				} else {
+					id, _ := res.LastInsertId()
+
+					fmt.Println("插入数据成功：", id)
+					openUpSubmitVideosFrom(tmpVide, c.Clone(), wg, db)
+				}
+
+			}
+			//wg.Done()
+		})
+		c.OnError(func(response *colly.Response, e error) {
+			fmt.Println(e.Error())
+			wg.Done()
+		})
+		c.Visit(video.VideoHome())
+
+	*/
 }
 
 func engineerSearch(url string, search *Search, c *colly.Collector, callback func(page int, result *SearchResult), finished func()) {
@@ -241,6 +331,7 @@ func start(page int, keyword string, mark *chan bool) {
 		collector.IgnoreRobotsTxt = true
 		collector.Async = true
 		collector.UserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1"
+		//collector.UserAgent = RandomString()
 	})
 	parseXiciProxy(c)
 	cc := c.Clone()
