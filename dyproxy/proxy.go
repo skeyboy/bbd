@@ -117,7 +117,7 @@ func AllProxy() []DyIp {
 	cc.Wait()
 
 	var wg sync.WaitGroup
-	for _, v := range tmpPool[len(tmpPool)/2 : len(tmpPool)/2+len(tmpPool)/3] {
+	for _, v := range tmpPool[0 : len(tmpPool)/2+len(tmpPool)/5] {
 		wg.Add(1)
 		v := v
 		ProxyThorn(v, &wg, func(d DyIp, code int) {

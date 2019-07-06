@@ -2,15 +2,54 @@ package bilibili
 
 import (
 	"../dyproxy"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/proxy"
+	"math/rand"
 	"net/url"
 	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 )
 
+const (
+	//user:password@/dbname
+	DB_Driver = "root:@/bbd"
+)
+
+func OpenDB() (success bool, db *sql.DB) {
+	var isOpen bool
+	db, err := sql.Open("mysql", "root:@/bbd")
+	if err != nil {
+		isOpen = false
+	} else {
+		isOpen = true
+	}
+	return isOpen, db
+}
+func insertUpToDB(db *sql.DB, mid string) (sql.Result, error) {
+
+	stmt, err := db.Prepare("insert into bbd_up(mid) values (?)")
+
+	res, err := stmt.Exec(mid)
+
+	return res, err
+}
+func convert(v int64) string {
+
+	return strconv.FormatInt(v, 10)
+}
+func insertTopic(tv TopicVideo, db *sql.DB) (sql.Result, error) {
+	stmt, err := db.Prepare("insert into bbd_topic(mid,aid,title,pic,description) value (?,?,?,?,?)")
+
+	res, err := stmt.Exec(tv.Mid, tv.Aid, tv.Title, tv.Pic, tv.Description)
+
+	return res, err
+}
 func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 
 	var pool = dyproxy.AllProxy()
@@ -25,13 +64,19 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 	}
 
 	wg.Wait()
-	rp, err := proxy.RoundRobinProxySwitcher(a...)
+	rp, err := proxy.RoundRobinProxySwitcher(
+		"//156.235.194.213:8080", "//207.154.200.199:3128", "//138.201.223.250:31288",
+		"//201.217.247.101:80",
+	)
 	/*
 		if err != nil {
 			log.Fatal(err)
 		}
 		c.SetProxyFunc(rp)
 	*/
+	if err != nil {
+		fmt.Println("❎", err.Error())
+	}
 
 	c.SetProxyFunc(rp)
 	return rp, err
@@ -40,15 +85,32 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 /**
 up主提交的所有视频
 */
-func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
-	defer wg.Done()
+func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup, db *sql.DB) {
 	tmpVideo := video
 	c.OnResponse(func(response *colly.Response) {
 		js := string(response.Body)
 		fmt.Println(video.Mid, ":up主的视频专辑:", js, tmpVideo)
+		var topic = Topic{}
+		json.Unmarshal(response.Body, &topic)
+
+		for _, tv := range topic.TopicData.TopicVideo {
+			tv := tv
+			res, e := insertTopic(tv, db)
+			if e != nil {
+				fmt.Println("插入主题", e.Error())
+			} else {
+				r, _ := res.LastInsertId()
+
+				fmt.Println("插入主题", r)
+			}
+		}
+		db.Close()
+
+		wg.Done()
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		fmt.Println("❌", e.Error(), string(response.Body))
+		wg.Done()
 	})
 	c.Visit(video.UpSubmitVideosAPI())
 }
@@ -68,12 +130,55 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 			fmt.Println("图像封面：", string(value))
 		}
 		result = regexp.MustCompile("window.__INITIAL_STATE__={(.*?)};").FindAll([]byte(element.Text), -1)
-		for _, value := range result {
-			fmt.Println("专辑详情：", string(value))
-		}
 
+		for _, value := range result {
+
+			dbResult, db := OpenDB()
+
+			info := string(value)
+
+			info = strings.ReplaceAll(info, "window.__INITIAL_STATE__=", "")
+			info = strings.ReplaceAll(info, ";", "")
+			fmt.Println("专辑详情：", info)
+
+			var album = Album{}
+			json.Unmarshal([]byte(info), &album)
+
+			if dbResult {
+				stmt, e := db.Prepare("insert into bbd_album(aid,videos,title,state,originTitle,origin) value(?,?,?,?,?,?)")
+				if e != nil {
+					db.Close()
+				} else {
+					origin := info
+					info := album.AlbumContext.AlbumInfo
+
+					res, e := stmt.Exec(info.Aid, info.Videos, info.Title, info.State, info.OriginTitle, origin)
+					if e != nil {
+						fmt.Println(e.Error())
+					} else {
+						r, _ := res.LastInsertId()
+						fmt.Println("专辑插入成功", r)
+					}
+					db.Close()
+				}
+			}
+
+		}
+		dbResult, db := OpenDB()
+		if dbResult {
+			res, err := insertUpToDB(db, video.mIdString())
+			if err != nil {
+				fmt.Println("插入数据失败", err.Error())
+				db.Close()
+			} else {
+				id, _ := res.LastInsertId()
+
+				fmt.Println("插入数据成功：", id)
+				openUpSubmitVideosFrom(tmpVide, c.Clone(), wg, db)
+			}
+
+		}
 		//wg.Done()
-		openUpSubmitVideosFrom(tmpVide, c.Clone(), wg)
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		fmt.Println(e.Error())
@@ -121,6 +226,16 @@ func engineerSearch(url string, search *Search, c *colly.Collector, callback fun
 	//c.Wait()
 }
 
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandomString() string {
+	b := make([]byte, rand.Intn(10)+10)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
 func start(page int, keyword string, mark *chan bool) {
 	c := colly.NewCollector(func(collector *colly.Collector) {
 		collector.IgnoreRobotsTxt = true
@@ -146,8 +261,13 @@ func start(page int, keyword string, mark *chan bool) {
 		for _, video := range result.Result.Video {
 			v := video
 			go open(&v, c.Clone(), &wg)
+			//if HasUp(v) == false {
+			//	Add(v)
+			//}
+			//wg.Done()
 		}
 		wg.Wait()
+
 		go start(int(result.Page)+1, keyword, mark)
 		//<-v
 		//close(v)
@@ -155,7 +275,10 @@ func start(page int, keyword string, mark *chan bool) {
 		//<-v
 		//close(v)
 		//os.Exit(0)
+		fmt.Println("获得的🉐", videos)
+
 		*mark <- true
+
 	})
 	//<-v
 
@@ -167,4 +290,28 @@ func Bilibili(page int, keyword string, v chan bool) {
 	go start(page, keyword, &v)
 	//<-v
 	//close(v)
+}
+
+var videos = []Video{}
+var lock sync.RWMutex
+
+func Add(v Video) {
+	videos = append(videos, v)
+}
+
+func HasUp(v Video) bool {
+	lock.Lock()
+
+	result := false
+	for _, value := range videos {
+		video := value
+		if v.Mid == video.Mid {
+			result = true
+			break
+		}
+	}
+
+	lock.Unlock()
+	return result
+
 }

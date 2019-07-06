@@ -20,7 +20,7 @@ func main() {
 		})
 		w.Flush()
 	*/
-	keywords := []string{"豫剧"}
+	keywords := []string{"豫剧", "京剧"}
 
 	v := make(chan bool, len(keywords))
 	defer close(v)
