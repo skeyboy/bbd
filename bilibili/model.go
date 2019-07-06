@@ -47,6 +47,38 @@ type Video struct {
 	Arcurl      string `json:"arcurl"`
 	Aid         int64  `json:"aid"`
 }
+type Topic struct {
+	TopicData TopicData `json:"data"`
+}
+type TopicData struct {
+	TopicVideo []TopicVideo `json:"vlist"`
+	Pages      int          `json:"pages"`
+	Count      int          `json:"count"`
+}
+type TopicVideo struct {
+	Title       string `json:"title"`
+	Mid         int64  `json:"mid"` //up主id
+	Pic         string `json:"pic"`
+	Description string `json:"description"`
+	Aid         int64  `json:"aid"`
+}
+type Album struct {
+	AlbumContext AlbumContext `json:"reduxAsyncConnect"`
+}
+type AlbumContext struct {
+	AlbumInfo AlbumInfo `json:"videoInfo"`
+}
+type AlbumInfo struct {
+	Aid         int64       `json:"aid"`
+	Videos      int         `json:"videos"`
+	Title       string      `json:"title"`
+	Desc        string      `json:"desc"`
+	State       int         `json:"state"`
+	OriginTitle string      `json:"originTitle"`
+	Pages       []AlbumPage `json:"pages"`
+}
+type AlbumPage struct {
+}
 
 func (v *Video) aIdString() string {
 	return strconv.FormatInt(v.Aid, 10)
