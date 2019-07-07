@@ -4,12 +4,17 @@ import (
 	"../dyproxy"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/proxy"
+	"io"
 	"math/rand"
+	"net"
+	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -126,12 +131,108 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 	})
 	c.Visit(video.UpSubmitVideosAPI())
 }
+func downloadFile(url string, name string, fb func(length, downLen int64)) error {
+	var (
+		fsize   int64
+		buf     = make([]byte, 32*1024)
+		written int64
+	)
+	//创建一个http client
+	client := new(http.Client)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Refer", "https://static.hdslb.com/play.swf")
 
+	//get方法获取资源
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	//读取服务器返回的文件大小
+	fsize, err = strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 32)
+	if err != nil {
+		fmt.Println(err)
+	}
+	//创建文件
+	file, err := os.Create("./video/" + name + ".mp4")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if resp.Body == nil {
+		return errors.New("body is null")
+	}
+	defer resp.Body.Close()
+	//下面是 io.copyBuffer() 的简化版本
+	for {
+		//读取bytes
+		nr, er := resp.Body.Read(buf)
+		if nr > 0 {
+			//写入bytes
+			nw, ew := file.Write(buf[0:nr])
+			//数据长度大于0
+			if nw > 0 {
+				written += int64(nw)
+			}
+			//写入出错
+			if ew != nil {
+				err = ew
+				break
+			}
+			//读取是数据长度不等于写入的数据长度
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+		//没有错误了快使用 callback
+
+		fb(fsize, written)
+	}
+	return err
+}
 func openAlbum(aid int64, c *colly.Collector, success func(), onError func(err error)) {
 	c.OnHTML("html", func(element *colly.HTMLElement) {
 		result := regexp.MustCompile("video_url: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
-			fmt.Println("视频地址：", string(value))
+			videourl := strings.ReplaceAll(string(value), "video_url: '//", "")
+			videourl = strings.ReplaceAll(videourl, "'", "")
+			yu := strings.Split(videourl, "/")
+
+			ns, err := net.LookupHost(yu[0])
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println("ip:", ns)
+			}
+			var resource = ""
+			if len(ns) > 1 {
+				for index, ip := range ns {
+					ip := ip
+					resource = "http://" + ip + "/" + videourl
+					fmt.Println("视频地址：", resource)
+					e := downloadFile(resource, convert(aid)+"-"+convert(int64(index)), func(length, downLen int64) {
+						fmt.Println("视频下载信息：", length, downLen, float32(downLen)/float32(length))
+					})
+					if e != nil {
+						fmt.Println(e.Error())
+					}
+				}
+			} else {
+				resource = "http://" + videourl
+
+				fmt.Println("视频地址：", yu, resource)
+				go downloadFile(resource, convert(aid), func(length, downLen int64) {
+					fmt.Println("视频下载信息：", length, downLen, float32(downLen)/float32(length))
+				})
+
+			}
+
 		}
 		result = regexp.MustCompile("image: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
