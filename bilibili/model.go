@@ -76,6 +76,12 @@ type AlbumInfo struct {
 	State       int         `json:"state"`
 	OriginTitle string      `json:"originTitle"`
 	Pages       []AlbumPage `json:"pages"`
+	Owner       AlbumOwner  `json:"owner"`
+}
+type AlbumOwner struct {
+	Mid  int64  `json:"mid"`
+	Name string `json:"name"`
+	Face string `json:"face"`
 }
 type AlbumPage struct {
 }

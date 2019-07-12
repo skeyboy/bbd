@@ -28,19 +28,66 @@ const (
 
 func OpenDB() (success bool, db *sql.DB) {
 	var isOpen bool
-	db, err := sql.Open("mysql", "root:@/bbd")
+	db, err := sql.Open("mysql", "root:12345678@/bbd")
 	if err != nil {
+		panic(err)
 		isOpen = false
 	} else {
 		isOpen = true
 	}
+	var up = `
+CREATE TABLE IF NOT EXISTS bbd.bbd_up  (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  mid int(11) NULL DEFAULT NULL,
+  status tinyint(4) NOT NULL DEFAULT 0,
+ face  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+   name  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  PRIMARY KEY (id) USING BTREE,
+  UNIQUE INDEX mid (mid) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+`
+	var topic = `CREATE TABLE IF NOT EXISTS  bbd.bbd_topic  (
+   id  int(11) NOT NULL AUTO_INCREMENT,
+   mid  int(11) NOT NULL,
+   aid  int(11) NOT NULL,
+   title  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+   pic  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+   description  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+   status  tinyint(4) NOT NULL DEFAULT 0,
+  PRIMARY KEY ( id ) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;`
+	var album = `CREATE TABLE IF NOT EXISTS bbd.bbd_album  (
+   id  int(11) NOT NULL AUTO_INCREMENT,
+   videos  int(11) NOT NULL DEFAULT 1,
+   title  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+   state  tinyint(4) NULL DEFAULT 0 COMMENT '三方系统，与我们无关',
+   originTitle  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+   origin  json NULL,
+   aid  int(11) NOT NULL,
+status  tinyint(4) NOT NULL DEFAULT 0,
+  PRIMARY KEY ( id ) USING BTREE,
+  UNIQUE INDEX  aid ( aid ) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;`
+	create_table(up, db)
+	create_table(topic, db)
+	create_table(album, db)
+
 	return isOpen, db
 }
-func insertUpToDB(db *sql.DB, mid string) (sql.Result, error) {
+func create_table(sql string, db *sql.DB) {
+	stmt, err := db.Prepare(sql)
+	if err != nil {
+		db.Close()
+		panic(err)
+	}
+	stmt.Exec()
+	stmt.Close()
+}
+func insertUpToDB(db *sql.DB, mid string, face string, name string) (sql.Result, error) {
 
-	stmt, err := db.Prepare("insert into bbd_up(mid) values (?)")
+	stmt, err := db.Prepare("insert into bbd_up(mid, face, name) values (?,?,?)")
 
-	res, err := stmt.Exec(mid)
+	res, err := stmt.Exec(mid, face, name)
 
 	return res, err
 }
@@ -70,7 +117,7 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 
 	wg.Wait()
 	rp, err := proxy.RoundRobinProxySwitcher(
-		"//156.235.194.213:8080", "47.52.27.97:31280",
+		"//35.244.20.250:80", "134.209.195.94:8080",
 	)
 	/*
 		if err != nil {
@@ -111,7 +158,7 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 
 				fmt.Println("插入主题", r)
 			}
-			go openAlbum(tv.Aid, c.Clone(), func() {
+			go openAlbum(tv.Aid, c.Clone(), func(album_owner AlbumOwner) {
 				fmt.Println("专辑完成…")
 				albumWg.Done()
 			}, func(err error) {
@@ -196,7 +243,7 @@ func downloadFile(url string, name string, fb func(length, downLen int64)) error
 	}
 	return err
 }
-func openAlbum(aid int64, c *colly.Collector, success func(), onError func(err error)) {
+func openAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwner), onError func(err error)) {
 	c.OnHTML("html", func(element *colly.HTMLElement) {
 		result := regexp.MustCompile("video_url: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
@@ -210,28 +257,30 @@ func openAlbum(aid int64, c *colly.Collector, success func(), onError func(err e
 			} else {
 				fmt.Println("ip:", ns)
 			}
-			var resource = ""
-			if len(ns) > 1 {
-				for index, ip := range ns {
-					ip := ip
-					resource = "http://" + ip + "/" + videourl
-					fmt.Println("视频地址：", resource)
-					e := downloadFile(resource, convert(aid)+"-"+convert(int64(index)), func(length, downLen int64) {
+			/*
+							var resource = ""
+
+					if len(ns) > 1 {
+					for index, ip := range ns {
+						ip := ip
+						resource = "http://" + ip + "/" + videourl
+						fmt.Println("视频地址：", resource)
+						e := downloadFile(resource, convert(aid)+"-"+convert(int64(index)), func(length, downLen int64) {
+							fmt.Println("视频下载信息：", length, downLen, float32(downLen)/float32(length))
+						})
+						if e != nil {
+							fmt.Println(e.Error())
+						}
+					}
+				} else {
+					resource = "http://" + videourl
+
+					fmt.Println("视频地址：", yu, resource)
+					go downloadFile(resource, convert(aid), func(length, downLen int64) {
 						fmt.Println("视频下载信息：", length, downLen, float32(downLen)/float32(length))
 					})
-					if e != nil {
-						fmt.Println(e.Error())
-					}
-				}
-			} else {
-				resource = "http://" + videourl
 
-				fmt.Println("视频地址：", yu, resource)
-				go downloadFile(resource, convert(aid), func(length, downLen int64) {
-					fmt.Println("视频下载信息：", length, downLen, float32(downLen)/float32(length))
-				})
-
-			}
+				}*/
 
 		}
 		result = regexp.MustCompile("image: '(.*?)'").FindAll([]byte(element.Text), -1)
@@ -271,9 +320,9 @@ func openAlbum(aid int64, c *colly.Collector, success func(), onError func(err e
 					db.Close()
 				}
 			}
+			success(album.AlbumContext.AlbumInfo.Owner)
 
 		}
-		success()
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		onError(e)
@@ -285,10 +334,10 @@ func openAlbum(aid int64, c *colly.Collector, success func(), onError func(err e
 
 func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 	tmpVide := video
-	openAlbum(video.Aid, c.Clone(), func() {
+	openAlbum(video.Aid, c.Clone(), func(album_owner AlbumOwner) {
 		dbResult, db := OpenDB()
 		if dbResult {
-			res, err := insertUpToDB(db, video.mIdString())
+			res, err := insertUpToDB(db, convert(album_owner.Mid), album_owner.Face, album_owner.Name)
 			if err != nil {
 				fmt.Println("插入数据失败", err.Error())
 				db.Close()
