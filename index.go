@@ -2,6 +2,7 @@ package main
 
 import (
 	"./bilibili"
+	"bbds/db"
 )
 
 func main() {
@@ -20,7 +21,9 @@ func main() {
 		})
 		w.Flush()
 	*/
-	keywords := []string{"豫剧", "京剧"}
+	//keywords := []string{"豫剧", "京剧",  }
+	keywords := []string{"豫剧", "京剧", "昆曲", "坠子戏", "粤剧", "淮剧", "川剧", "秦腔", "沪剧", "晋剧", "汉剧", "河北梆子",
+		"河南越调", "河南坠子", "湘剧", "湖南花鼓戏", "穆桂英", "沙家浜", "苏武牧羊", "小二黑"}
 
 	v := make(chan bool, len(keywords))
 	defer close(v)
@@ -32,4 +35,5 @@ func main() {
 	for i := 0; i < cap(v); i++ {
 		<-v
 	}
+	db.Close()
 }

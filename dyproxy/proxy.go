@@ -32,6 +32,8 @@ func (dyIp *DyIp) FullIp() string {
 }
 
 func ProxyThorn(proxy_addr DyIp, wg *sync.WaitGroup, result func(d DyIp, code int)) (ip string, dyIp DyIp, status int) {
+	time.Sleep(time.Second * 1)
+
 	//访问查看ip的一个网址
 	httpUrl := "http://icanhazip.com"
 	httpUrl = "https://www.baidu.com"
@@ -39,11 +41,11 @@ func ProxyThorn(proxy_addr DyIp, wg *sync.WaitGroup, result func(d DyIp, code in
 
 	netTransport := &http.Transport{
 		Proxy:                 http.ProxyURL(proxy),
-		MaxIdleConnsPerHost:   10,
-		ResponseHeaderTimeout: time.Second * time.Duration(5),
+		MaxIdleConnsPerHost:   5,
+		ResponseHeaderTimeout: time.Second * time.Duration(50),
 	}
 	httpClient := &http.Client{
-		Timeout:   time.Second * 10,
+		Timeout:   time.Second * 30,
 		Transport: netTransport,
 	}
 	res, err := httpClient.Get(httpUrl)
@@ -63,7 +65,28 @@ func ProxyThorn(proxy_addr DyIp, wg *sync.WaitGroup, result func(d DyIp, code in
 	msg := string(c)
 	return msg, proxy_addr, res.StatusCode
 }
+func xic(dyIp *DyIp, i int, conent string) {
+	switch i {
+	case 1:
+		dyIp.Ip = conent
+	case 2:
+		dyIp.Port = conent
+	case 3:
+		dyIp.Location = conent
+	case 5:
+		dyIp.Scheme = conent
+
+	case 8:
+		dyIp.UpdateDateTime = conent
+	}
+}
+
+var ipPool = []DyIp{}
+
 func AllProxy() []DyIp {
+	if len(ipPool) != 0 {
+		return ipPool
+	}
 	c := colly.NewCollector(func(collector *colly.Collector) {
 		collector.IgnoreRobotsTxt = true
 		collector.Async = true
@@ -79,30 +102,43 @@ func AllProxy() []DyIp {
 
 			element.ForEach("td", func(i int, e *colly.HTMLElement) {
 				content := strings.ReplaceAll(strings.ReplaceAll(e.Text, "\t", ""), "\n", "")
+				if e.Request.URL.Host == "www.xicidaili.com" {
 
-				switch i {
-				case 0:
-					dyIp.Ip = content
-					break
-				case 1:
-					dyIp.Port = content
-					break
-				case 3:
-					dyIp.Scheme = content
-					break
+					xic(&dyIp, i, content)
+				} else {
+					switch i {
+					case 0:
+						dyIp.Ip = content
+						break
+					case 1:
+						dyIp.Port = content
+						break
+					case 3:
+						dyIp.Scheme = content
+						break
 
-				case 4:
-					dyIp.Location = content
-					break
-				case 2:
-					dyIp.Owner = content
-					break
-				case 6:
-					dyIp.UpdateDateTime = content
+					case 4:
+						dyIp.Location = content
+						break
+					case 2:
+						dyIp.Owner = content
+						break
+					case 6:
+						dyIp.UpdateDateTime = content
 
+					}
 				}
 			})
-			tmpPool = append(tmpPool, dyIp)
+
+			if element.Request.URL.Host == "www.xicidaili.com" {
+				//西祠
+				if strings.Contains(dyIp.UpdateDateTime, "分钟") {
+					tmpPool = append(tmpPool, dyIp)
+				}
+
+			} else {
+				tmpPool = append(tmpPool, dyIp)
+			}
 
 		})
 		fmt.Println(tmpPool)
@@ -112,8 +148,9 @@ func AllProxy() []DyIp {
 		fmt.Println(e.Error())
 	})
 
-	cc.Visit("http://www.89ip.cn")
-	//cc.Visit("http://www.qydaili.com/free/")
+	//cc.Visit("http://www.89ip.cn")
+	cc.Visit("http://www.qydaili.com/free/")
+	//cc.Visit("https://www.xicidaili.com/wt/")
 	cc.Wait()
 
 	var wg sync.WaitGroup
@@ -130,6 +167,7 @@ func AllProxy() []DyIp {
 
 	}
 	wg.Wait()
+	ipPool = tmpPool
 
-	return proxyPool
+	return ipPool
 }
