@@ -24,10 +24,11 @@ type Search struct {
 	Movie_num   int    `json:"movie_num"`
 }
 type SearchResult struct {
-	Result Result  `json:"result"`
-	Seid   string  `json:"seid"`
-	Msg    string  `json:"msg"`
-	Page   float64 `json:"page"`
+	Result   Result  `json:"result"`
+	Seid     string  `json:"seid"`
+	Msg      string  `json:"msg"`
+	Page     float64 `json:"page"`
+	PageSize int64   `json:"pagesize"`
 }
 
 func (s *SearchResult) IsSuccess() bool {

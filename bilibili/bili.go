@@ -1,8 +1,8 @@
 package bilibili
 
 import (
-	"../bdb"
-	"../dyproxy"
+	"bbd/bdb"
+	"bbd/dyproxy"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 func OpenDB() (success bool, db *sql.DB) {
@@ -28,11 +29,20 @@ func OpenDB() (success bool, db *sql.DB) {
 }
 
 func insertUpToDB(db *sql.DB, mid string, face string, name string) (sql.Result, error) {
+	tx, _ := db.Begin()
 
-	stmt, err := db.Prepare("insert into bbd_up(mid, face, name) values (?,?,?)")
+	stmt, err := tx.Prepare("insert into bbd_up(mid, face, name) values (?,?,?)")
 
 	res, err := stmt.Exec(mid, face, name)
+	if err != nil {
+		tx.Rollback()
 
+	} else {
+		e := tx.Commit()
+		if e != nil {
+			tx.Rollback()
+		}
+	}
 	return res, err
 }
 func convert(v int64) string {
@@ -40,10 +50,18 @@ func convert(v int64) string {
 	return strconv.FormatInt(v, 10)
 }
 func insertTopic(tv TopicVideo, db *sql.DB) (sql.Result, error) {
-	stmt, err := db.Prepare("insert into bbd_topic(mid,aid,title,pic,description) value (?,?,?,?,?)")
+	tx, e := db.Begin()
+	stmt, err := tx.Prepare("insert into bbd_topic(mid,aid,title,pic,description) value (?,?,?,?,?)")
 
 	res, err := stmt.Exec(tv.Mid, tv.Aid, tv.Title, tv.Pic, tv.Description)
-
+	if err != nil {
+		tx.Rollback()
+	} else {
+		e = tx.Commit()
+		if e != nil {
+			tx.Rollback()
+		}
+	}
 	return res, err
 }
 func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
@@ -58,11 +76,19 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 		v := v
 		fmt.Println("可用IP", v)
 		a = append(a, v.FullIp())
-		pre, _ := db.Prepare("insert into bbd_ip(ip,port) value(?,?)")
+
+		tx, _ := db.Begin()
+		pre, _ := tx.Prepare("insert into bbd_ip(ip,port) value(?,?)")
 
 		_, err := pre.Exec(v.Ip, v.Port)
 		if err != nil {
+			tx.Rollback()
 			fmt.Println("ip错误", err.Error())
+		} else {
+			e := tx.Commit()
+			if e != nil {
+				tx.Rollback()
+			}
 		}
 		pre.Close()
 
@@ -118,14 +144,22 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 			}, func(url *url.URL, err error) {
 				fmt.Println("专辑失败", err)
 				//把失败的专辑入库，恢复的时候优先爬取
-				stmt, _ := db.Prepare("insert into bbd.bbd_album_failed(album_url) value(?)")
+				tx, _ := db.Begin()
+				stmt, _ := tx.Prepare("insert into bbd.bbd_album_failed(album_url) value(?)")
 				if stmt != nil {
 					defer stmt.Close()
 					res, err := stmt.Exec(url.Scheme + "://" + url.Host + url.Path)
 					if err != nil {
+						if e != nil {
+							tx.Rollback()
+						}
 						fmt.Println("失败保存失败", err.Error())
 					} else {
 						r, _ := res.LastInsertId()
+						e := tx.Commit()
+						if e != nil {
+							tx.Rollback()
+						}
 						fmt.Println("失败保存成功", r)
 					}
 				}
@@ -143,6 +177,8 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 		// wg.Done() //外层的🔐
 
 	})
+	//根据id进行随机的时间休息
+	time.Sleep(time.Second * time.Duration(video.Id%10))
 	c.Visit(video.UpSubmitVideosAPI())
 }
 func downloadFile(url string, name string, fb func(length, downLen int64)) error {
@@ -247,18 +283,25 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 				json.Unmarshal([]byte(info), &album)
 
 				if dbResult {
-					stmt, e := db.Prepare("insert into bbd_album(aid,videos,title,state,originTitle,origin) value(?,?,?,?,?,?)")
+					tx, _ := db.Begin()
+					stmt, e := tx.Prepare("insert into bbd_album(aid,videos,title,state,originTitle,origin) value(?,?,?,?,?,?)")
 					if e != nil {
-
+						tx.Rollback()
 					} else {
 						origin := info
 						info := album.AlbumContext.AlbumInfo
 
 						res, e := stmt.Exec(info.Aid, info.Videos, info.Title, info.State, info.OriginTitle, origin)
 						if e != nil {
+							tx.Rollback()
 							fmt.Println(e.Error())
 						} else {
 							r, _ := res.LastInsertId()
+							e := tx.Commit()
+							if e != nil {
+								tx.Rollback()
+							}
+
 							fmt.Println("专辑插入成功", r)
 						}
 						stmt.Close()
@@ -270,8 +313,9 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 		}
 	})
 	c.OnError(func(response *colly.Response, e error) {
-		onError(response.Request.URL, e)
+		//onError(response.Request.URL, e)
 	})
+	time.Sleep(time.Second * time.Duration(aid%10))
 	c.Visit("https://m.bilibili.com/video/av" + convert(aid) + ".html")
 }
 
@@ -288,7 +332,6 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 				wg.Done()
 			} else {
 				id, _ := res.LastInsertId()
-
 				fmt.Println("插入数据成功：", id)
 				openUpSubmitVideosFrom(tmpVide, c.Clone(), wg, db)
 			}
@@ -386,6 +429,7 @@ func start(page int, keyword string, mark *chan bool) {
 			go open(&v, c.Clone(), &wg)
 		}
 		wg.Wait()
+		time.Sleep(time.Second * time.Duration(page))
 
 		go start(int(result.Page)+1, keyword, mark)
 	}, func() {

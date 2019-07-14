@@ -5,6 +5,7 @@ import (
 	"github.com/gocolly/colly"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -31,12 +32,19 @@ func (dyIp *DyIp) FullIp() string {
 	return dyIp.Ip + ":" + dyIp.Port
 }
 
+var hosts = []string{
+	"https://www.baidu.com",
+	"https://www.json.cn/",
+	"https://blog.csdn.net/weixin_42100098/article/details/80150077",
+	"http://www.w3school.com.cn/index.html",
+}
+
 func ProxyThorn(proxy_addr DyIp, wg *sync.WaitGroup, result func(d DyIp, code int)) (ip string, dyIp DyIp, status int) {
 	time.Sleep(time.Second * 1)
 
 	//访问查看ip的一个网址
-	httpUrl := "http://icanhazip.com"
-	httpUrl = "https://www.baidu.com"
+	httpUrl := hosts[rand.Int()%len(hosts)]
+	//httpUrl = "https://www.baidu.com"
 	proxy, err := url.Parse(proxy_addr.FullIp())
 
 	netTransport := &http.Transport{
