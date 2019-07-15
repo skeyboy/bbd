@@ -2,6 +2,7 @@ package main
 
 import (
 	"./bilibili"
+	"math"
 	"os"
 	"sync"
 )
@@ -23,7 +24,7 @@ func main() {
 		w.Flush()
 	*/
 	//keywords := []string{"豫剧", "京剧",  }
-	keywords := []string{"豫剧", "京剧", "秦腔", "话剧",
+	keywords := []string{"豫剧", "京剧", "秦腔",
 		"曲剧", "晋剧", "二人转", "太平调", "川剧",
 	}
 
@@ -39,10 +40,15 @@ func main() {
 	//}
 
 	//控制后续启动之后的并发量
-	var stepp = 2
+	var step = 3
 	var index = 0
 	var lock sync.RWMutex
-	go stepper(v, keywords[index])
+	next := int(math.Min(float64(index+step), float64(len(keywords))))
+	sub := keywords[index:next]
+	for _, value := range sub {
+		value := value
+		go stepper(v, value)
+	}
 	for {
 		select {
 		case <-v:
