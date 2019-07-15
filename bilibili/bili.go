@@ -1,8 +1,8 @@
 package bilibili
 
 import (
-	"bbd/bdb"
-	"bbd/dyproxy"
+	"../bdb"
+	"../dyproxy"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -424,6 +424,7 @@ func start(page int, keyword string, mark *chan bool) {
 		//fmt.Println(result.Page, "/t", result)
 		var wg sync.WaitGroup
 		wg.Add(len(result.Result.Video))
+
 		for _, video := range result.Result.Video {
 			v := video
 			go open(&v, c.Clone(), &wg)
@@ -434,7 +435,7 @@ func start(page int, keyword string, mark *chan bool) {
 		go start(int(result.Page)+1, keyword, mark)
 	}, func() {
 		//close(*mark)
-		fmt.Println("获得的🉐")
+		fmt.Println("获得的🉐", keyword)
 
 		*mark <- true
 

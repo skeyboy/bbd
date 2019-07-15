@@ -1,7 +1,7 @@
 package bdb
 
 import (
-	"bbd/config"
+	"../config"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"sync"
