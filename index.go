@@ -2,8 +2,8 @@ package main
 
 import (
 	"./bilibili"
+	"fmt"
 	"math"
-	"os"
 	"sync"
 )
 
@@ -40,7 +40,7 @@ func main() {
 	//}
 
 	//控制后续启动之后的并发量
-	var step = 3
+	var step = 2
 	var index = 0
 	var lock sync.RWMutex
 	next := int(math.Min(float64(index+step), float64(len(keywords))))
@@ -49,20 +49,33 @@ func main() {
 		value := value
 		go stepper(v, value)
 	}
+	index += step
 	for {
 		select {
 		case <-v:
-			lock.Lock()
-			index = index + 1
 
-			lock.Unlock()
+			//保证总是有N个在执行
 			if index < len(keywords) {
-				go stepper(v, keywords[index])
+				lock.Lock()
+				var next = index
+				index = index + 1
+				lock.Unlock()
+				go stepper(v, keywords[next])
 			} else {
-				os.Exit(0)
+				if len(v) == 0 {
+					fmt.Println("准备清空")
+					//os.Exit(0)
+					lock.Lock()
+					defer lock.Unlock()
+					for range v {
+						close(v)
+					}
+
+				}
 			}
 		}
 	}
+
 }
 func stepper(v chan bool, keyword string) {
 	go bilibili.Bilibili(1, keyword, v)
