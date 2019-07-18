@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./bdb"
 	"./bilibili"
 	"fmt"
 	"math"
@@ -25,7 +26,7 @@ func main() {
 	*/
 	//keywords := []string{"豫剧", "京剧",  }
 	keywords := []string{"豫剧", "京剧", "秦腔",
-		"曲剧", "晋剧", "二人转", "太平调", "川剧",
+		"曲剧", "晋剧", "评剧", "越剧", "黄梅戏",
 	}
 
 	v := make(chan bool, len(keywords))
@@ -50,6 +51,7 @@ func main() {
 		go stepper(v, value)
 	}
 	index += step
+loop:
 	for {
 		select {
 		case <-v:
@@ -70,12 +72,39 @@ func main() {
 					for range v {
 						close(v)
 					}
-
+					break loop
 				}
 			}
 		}
 	}
+	fmt.Println("爬取：", keywords, "完成")
+	clearTopic := `DELETE a.* from bbd_topic a WHERE a.mid NOT IN (SELECT c.mid FROM (SELECT b.mid FROM bbd_topic b WHERE b.title REGEXP "(豫剧)+|(京剧)+|(秦腔)+|(曲剧)+|(晋剧)+|(评剧)+|(越剧)+|(黄梅戏)+"  OR b.description REGEXP "(豫剧)+|(京剧)+|(秦腔)+|(曲剧)+|(晋剧)+|(评剧)+|(越剧)+|(黄梅戏)+")  c)`
+	clearAlbum := `DELETE a.* FROM bbd_album a WHERE a.aid NOT IN (SELECT c.aid FROM (SELECT b.aid FROM bbd_album b WHERE b.title REGEXP "(豫剧)+|(京剧)+|(秦腔)+|(曲剧)+|(晋剧)+|(评剧)+|(越剧)+|(黄梅戏)+" OR b.origin REGEXP "(豫剧)+|(京剧)+|(秦腔)+|(曲剧)+|(晋剧)+|(评剧)+|(越剧)+|(黄梅戏)+"  ) c)`
 
+	tResult, te := bdb.GlobalDB().Exec(clearTopic)
+	if te != nil {
+		fmt.Println(te.Error())
+	} else {
+		r, e := tResult.RowsAffected()
+		if e != nil {
+			fmt.Println(e.Error())
+		} else {
+			fmt.Println("清洗数据条目:", r)
+		}
+	}
+
+	aResult, ae := bdb.GlobalDB().Exec(clearAlbum)
+	if ae != nil {
+		fmt.Println(ae.Error())
+	} else {
+		r, e := aResult.RowsAffected()
+		if e != nil {
+			fmt.Println(e.Error())
+		} else {
+			fmt.Println("清洗数据条目:", r)
+		}
+	}
+	bdb.GlobalDB().Close()
 }
 func stepper(v chan bool, keyword string) {
 	go bilibili.Bilibili(1, keyword, v)

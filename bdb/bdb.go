@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS bbd.bbd_up  (
   status tinyint(4) NOT NULL DEFAULT 0,
  face  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
    name  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP(0),
+
   PRIMARY KEY (id) USING BTREE,
   UNIQUE INDEX mid (mid) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS bbd.bbd_up  (
    title  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
    pic  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
    description  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP(0),
    status  tinyint(4) NOT NULL DEFAULT 0,
   PRIMARY KEY ( id ) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;`
@@ -76,6 +79,7 @@ CREATE TABLE IF NOT EXISTS bbd.bbd_up  (
    origin  json NULL,
    aid  int(11) NOT NULL,
 status  tinyint(4) NOT NULL DEFAULT 0,
+create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP(0),
   PRIMARY KEY ( id ) USING BTREE,
   UNIQUE INDEX  aid ( aid ) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;`
@@ -85,6 +89,7 @@ status  tinyint(4) NOT NULL DEFAULT 0,
   ip varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
   port int(11) NULL DEFAULT 8080,
   status tinyint(4) NOT NULL DEFAULT 1 COMMENT '0 可用 1 待验证',
+create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP(0),
   PRIMARY KEY (id) USING BTREE,
   UNIQUE INDEX ip(ip) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;`

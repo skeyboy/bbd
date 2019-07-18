@@ -292,6 +292,7 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 						info := album.AlbumContext.AlbumInfo
 
 						res, e := stmt.Exec(info.Aid, info.Videos, info.Title, info.State, info.OriginTitle, origin)
+						defer stmt.Close()
 						if e != nil {
 							tx.Rollback()
 							fmt.Println(e.Error())
@@ -304,7 +305,7 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 
 							fmt.Println("专辑插入成功", r)
 						}
-						stmt.Close()
+
 					}
 				}
 				success(album.AlbumContext.AlbumInfo.Owner)
