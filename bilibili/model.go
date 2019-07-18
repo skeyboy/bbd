@@ -85,6 +85,8 @@ type AlbumOwner struct {
 	Face string `json:"face"`
 }
 type AlbumPage struct {
+	PageNum int    `json:"page"`
+	Part    string `json:"part"`
 }
 
 func (v *Video) aIdString() string {
