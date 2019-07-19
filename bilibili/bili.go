@@ -6,11 +6,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/proxy"
 	"io"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -74,7 +74,7 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 
 	for _, v := range pool {
 		v := v
-		fmt.Println("可用IP", v)
+		log.Println("可用IP", v)
 		a = append(a, v.FullIp())
 
 		tx, _ := db.Begin()
@@ -83,7 +83,7 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 		_, err := pre.Exec(v.Ip, v.Port)
 		if err != nil {
 			tx.Rollback()
-			fmt.Println("ip错误", err.Error())
+			log.Println("ip错误", err.Error())
 		} else {
 			e := tx.Commit()
 			if e != nil {
@@ -103,7 +103,7 @@ func parseXiciProxy(c *colly.Collector) (colly.ProxyFunc, error) {
 		c.SetProxyFunc(rp)
 	*/
 	if err != nil {
-		fmt.Println("❎", err.Error())
+		log.Println("❎", err.Error())
 	}
 
 	c.SetProxyFunc(rp)
@@ -119,7 +119,7 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 	tmpVideo := video
 	c.OnResponse(func(response *colly.Response) {
 		js := string(response.Body)
-		fmt.Println(video.Mid, ":up主的视频专辑:", js, tmpVideo)
+		log.Println(video.Mid, ":up主的视频专辑:", js, tmpVideo)
 		var topic = Topic{}
 		json.Unmarshal(response.Body, &topic)
 
@@ -131,18 +131,18 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 			tv := tv
 			res, e := insertTopic(tv, db)
 			if e != nil {
-				fmt.Println("插入主题", e.Error())
+				log.Println("插入主题", e.Error())
 			} else {
 				r, _ := res.LastInsertId()
 
-				fmt.Println("插入主题", r)
+				log.Println("插入主题", r)
 			}
 			go OpenAlbum(tv.Aid, c.Clone(), func(album_owner AlbumOwner) {
-				fmt.Println("专辑完成…")
+				log.Println("专辑完成…")
 				albumWg.Done()
 
 			}, func(url *url.URL, err error) {
-				fmt.Println("专辑失败", err)
+				log.Println("专辑失败", err)
 				//把失败的专辑入库，恢复的时候优先爬取
 				tx, _ := db.Begin()
 				stmt, _ := tx.Prepare("insert into bbd.bbd_album_failed(album_url) value(?)")
@@ -153,14 +153,14 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 						if e != nil {
 							tx.Rollback()
 						}
-						fmt.Println("失败保存失败", err.Error())
+						log.Println("失败保存失败", err.Error())
 					} else {
 						r, _ := res.LastInsertId()
 						e := tx.Commit()
 						if e != nil {
 							tx.Rollback()
 						}
-						fmt.Println("失败保存成功", r)
+						log.Println("失败保存成功", r)
 					}
 				}
 				albumWg.Done()
@@ -172,7 +172,7 @@ func openUpSubmitVideosFrom(video *Video, c *colly.Collector, wg *sync.WaitGroup
 
 	})
 	c.OnError(func(response *colly.Response, e error) {
-		fmt.Println("❌", e.Error(), string(response.Body))
+		log.Println("❌", e.Error(), string(response.Body))
 		//wg.Done()
 		// wg.Done() //外层的🔐
 
@@ -200,7 +200,7 @@ func downloadFile(url string, name string, fb func(length, downLen int64)) error
 	//读取服务器返回的文件大小
 	fsize, err = strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 32)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	//创建文件
 	file, err := os.Create("./video/" + name + ".mp4")
@@ -256,14 +256,14 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 
 			ns, err := net.LookupHost(yu[0])
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			} else {
-				fmt.Println("ip:", ns)
+				log.Println("ip:", ns)
 			}
 		}
 		result = regexp.MustCompile("image: '(.*?)'").FindAll([]byte(element.Text), -1)
 		for _, value := range result {
-			fmt.Println("图像封面：", string(value))
+			log.Println("图像封面：", string(value))
 		}
 		result = regexp.MustCompile("window.__INITIAL_STATE__={(.*?)};").FindAll([]byte(element.Text), -1)
 		if len(result) == 0 {
@@ -277,7 +277,7 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 
 				info = strings.ReplaceAll(info, "window.__INITIAL_STATE__=", "")
 				info = strings.ReplaceAll(info, ";", "")
-				fmt.Println("专辑详情：", info)
+				log.Println("专辑详情：", info)
 
 				var album = Album{}
 				json.Unmarshal([]byte(info), &album)
@@ -295,7 +295,7 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 						defer stmt.Close()
 						if e != nil {
 							tx.Rollback()
-							fmt.Println(e.Error())
+							log.Println(e.Error())
 						} else {
 							r, _ := res.LastInsertId()
 							e := tx.Commit()
@@ -303,7 +303,7 @@ func OpenAlbum(aid int64, c *colly.Collector, success func(album_owner AlbumOwne
 								tx.Rollback()
 							}
 
-							fmt.Println("专辑插入成功", r)
+							log.Println("专辑插入成功", r)
 						}
 
 					}
@@ -329,11 +329,11 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 		if dbResult {
 			res, err := insertUpToDB(db, convert(album_owner.Mid), album_owner.Face, album_owner.Name)
 			if err != nil {
-				fmt.Println("插入数据失败", err.Error())
+				log.Println("插入数据失败", err.Error())
 				wg.Done()
 			} else {
 				id, _ := res.LastInsertId()
-				fmt.Println("插入数据成功：", id)
+				log.Println("插入数据成功：", id)
 				openUpSubmitVideosFrom(tmpVide, c.Clone(), wg, db)
 			}
 
@@ -341,7 +341,7 @@ func open(video *Video, c *colly.Collector, wg *sync.WaitGroup) {
 			wg.Done()
 		}
 	}, func(url *url.URL, err error) {
-		fmt.Println(url, err.Error())
+		log.Println(url, err.Error())
 		wg.Done()
 	})
 
@@ -356,22 +356,22 @@ func engineerSearch(url string, search *Search, c *colly.Collector, callback fun
 	})
 	c.OnError(func(response *colly.Response, e error) {
 		if e != nil {
-			fmt.Println("⚠️", e.Error(), string(response.Body))
+			log.Println("⚠️", e.Error(), string(response.Body))
 			finished()
 		}
 	})
 	c.OnResponse(func(response *colly.Response) {
-		//fmt.Println(string(response.Body))
+		//log.Println(string(response.Body))
 		var searchResult = SearchResult{}
 		e := json.Unmarshal(response.Body, &searchResult)
 		if e != nil {
-			fmt.Println("❌")
+			log.Println("❌")
 			finished()
 		}
 		if searchResult.IsSuccess() {
 			callback(search.Page+1, &searchResult)
 		} else {
-			fmt.Println("结束🔚", searchResult.Msg, searchResult.Page)
+			log.Println("结束🔚", searchResult.Msg, searchResult.Page)
 			finished()
 		}
 	})
@@ -415,14 +415,14 @@ func start(page int, keyword string, mark *chan bool) {
 
 	cc.OnResponse(func(response *colly.Response) {
 		//关闭其实页面结果
-		fmt.Print(response)
+		log.Print(response)
 	})
 	search := Search{Keyword: url.QueryEscape(keyword), Order: "totalrank", Main_ver: "v3", Page: page, Bangumi_num: 3, Movie_num: 3}
 	url := "https://m.bilibili.com/search/searchengine"
 
 	go engineerSearch(url, &search, cc.Clone(), func(p int, result *SearchResult) {
 		//关闭关键词搜索🔍结果log展示
-		//fmt.Println(result.Page, "/t", result)
+		//log.Println(result.Page, "/t", result)
 		var wg sync.WaitGroup
 		wg.Add(len(result.Result.Video))
 
@@ -436,7 +436,7 @@ func start(page int, keyword string, mark *chan bool) {
 		go start(int(result.Page)+1, keyword, mark)
 	}, func() {
 		//close(*mark)
-		fmt.Println("获得的🉐", keyword)
+		log.Println("获得的🉐", keyword)
 
 		*mark <- true
 
@@ -451,11 +451,11 @@ func recover_album(page int, limit int) []string {
 	sql := "select album_url from bbd.bbd_album_failed limit ? offset ?"
 	stmt, err := bdb.GlobalDB().Prepare(sql)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 	} else {
 		rows, err := stmt.Query(limit, limit*(page-1))
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		} else {
 
 			for rows.Next() {

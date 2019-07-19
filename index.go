@@ -15,9 +15,9 @@ func main() {
 		"曲剧", "晋剧", "评剧", "越剧", "黄梅戏",
 	}
 
-	//数据清洗合并
-	merge_db(keywords)
-	return
+	////数据清洗合并
+	//merge_db(keywords)
+	//return
 	v := make(chan bool, len(keywords))
 
 	//控制后续启动之后的并发量
@@ -58,6 +58,8 @@ loop:
 		}
 	}
 	log.Println("爬取：", keywords, "完成")
+	//数据清洗合并
+	merge_db(keywords)
 
 	bdb.GlobalDB().Close()
 }
