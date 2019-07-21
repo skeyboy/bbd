@@ -114,7 +114,6 @@ create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIM
 	var topics = `CREATE TABLE IF NOT EXISTS topics (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   av varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '专题在B站唯一标识',
-  topic_url varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '专题的地址',
   up_id varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'up主的唯一标识',
   img varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '专题封面',
   title varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '专题标题',
@@ -122,6 +121,8 @@ create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIM
   status tinyint(3) unsigned NOT NULL DEFAULT '0' COMMENT '状态1可用，0禁用',
   created_at timestamp NULL DEFAULT NULL,
   updated_at timestamp NULL DEFAULT NULL,
+  category_id int(11) NOT NULL DEFAULT 0,
+  duration varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY topics_av_unique (av),
   KEY topics_up_id_index (up_id)
@@ -141,12 +142,22 @@ create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIM
   status tinyint(3) unsigned NOT NULL DEFAULT '2' COMMENT '状态1可用，0禁用，2新抓取',
   created_at timestamp NULL DEFAULT NULL,
   updated_at timestamp NULL DEFAULT NULL,
+  duration varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
   PRIMARY KEY (id),
   KEY topic_videos_topic_id_index (topic_id),
   KEY topic_videos_av_index (av),
   KEY topic_videos_category_id_index (category_id)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
 
+	var ups = `CREATE TABLE  IF NOT EXISTS ups  (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  mid int(11) NOT NULL DEFAULT 0,
+  status tinyint(4) NOT NULL DEFAULT 0,
+  face varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  name varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP(0),
+  PRIMARY KEY (id) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = Dynamic;`
 	create_table(up, db)
 	create_table(topic, db)
 	create_table(album, db)
@@ -156,6 +167,7 @@ create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIM
 	create_table(categories, db)
 	create_table(topics, db)
 	create_table(topic_videos, db)
+	create_table(ups, db)
 
 	return isOpen, db
 }

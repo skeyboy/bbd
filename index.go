@@ -64,8 +64,8 @@ func main() {
 	keywords := strings.Split(kinds, "\n")
 
 	//数据清洗合并
-	//merge_db(keywords)
-	//return
+	merge_db(keywords)
+	return
 	v := make(chan bool, len(keywords))
 
 	//控制后续启动之后的并发量
@@ -229,7 +229,7 @@ func merge_up(owner bilibili.AlbumOwner) {
 		}
 	}
 }
-func merge_topic_page(aid int64, topicId int64) {
+func merge_topic_page(aid int64, topicId int64, categoryId int) {
 	sql := `SELECT ba.origin FROM bbd_album ba WHERE ba.aid = ?`
 	stmt, e := bdb.GlobalDB().Prepare(sql)
 	if e != nil {
@@ -248,13 +248,13 @@ func merge_topic_page(aid int64, topicId int64) {
 
 		//插入每一页数据
 		for _, page := range pages {
-			sql = "insert into topic_videos(topic_id,av,p,title) values(?,?,?,?)"
+			sql = "insert into topic_videos(topic_id,av,p,title,duration,category_id,cid) values(?,?,?,?,?,?,?)"
 			stmt, e := bdb.GlobalDB().Prepare(sql)
 			if e != nil {
 				log.Println(e.Error())
 			} else {
 				defer stmt.Close()
-				res, e := stmt.Exec(topicId, aid, page.PageNum, page.Part)
+				res, e := stmt.Exec(topicId, aid, page.PageNum, page.Part, page.VideoTineLength, categoryId, page.Cid)
 				if e != nil {
 					log.Println("主题每条列表：", e.Error())
 				} else {
@@ -286,7 +286,7 @@ func merge_topic(keyword string, keyid int) {
 						log.Println(e.Error())
 					} else {
 						//查找子项进行处理
-						merge_topic_page(v.Aid, lastId)
+						merge_topic_page(v.Aid, lastId, keyid)
 						log.Println(r.RowsAffected())
 					}
 

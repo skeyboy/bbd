@@ -69,16 +69,18 @@ type Album struct {
 type AlbumContext struct {
 	AlbumInfo AlbumInfo `json:"videoInfo"`
 }
+
 type AlbumInfo struct {
-	Aid         int64       `json:"aid"`
-	Videos      int         `json:"videos"`
-	Title       string      `json:"title"`
-	Desc        string      `json:"desc"`
-	State       int         `json:"state"`
-	OriginTitle string      `json:"originTitle"`
-	Pages       []AlbumPage `json:"pages"`
-	Owner       AlbumOwner  `json:"owner"`
-	Cid         int         `json:"cid"`
+	Aid             int64       `json:"aid"`
+	Videos          int         `json:"videos"`
+	Title           string      `json:"title"`
+	Desc            string      `json:"desc"`
+	State           int         `json:"state"`
+	OriginTitle     string      `json:"originTitle"`
+	Pages           []AlbumPage `json:"pages"`
+	Owner           AlbumOwner  `json:"owner"`
+	Cid             int         `json:"cid"`
+	VideoTineLength interface{} `json:"duration"`
 }
 type AlbumOwner struct {
 	Mid  int64  `json:"mid"`
@@ -86,9 +88,10 @@ type AlbumOwner struct {
 	Face string `json:"face"`
 }
 type AlbumPage struct {
-	PageNum int    `json:"page"`
-	Part    string `json:"part"`
-	Cid     int    `json:"cid"`
+	PageNum         int         `json:"page"`
+	Part            string      `json:"part"`
+	Cid             int         `json:"cid"`
+	VideoTineLength interface{} `json:"duration"`
 }
 
 func (v *Video) aIdString() string {
