@@ -6,18 +6,66 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"strings"
 	"sync"
 )
 
 func main() {
+	kinds := `昆曲
+京剧
+越剧
+黄梅戏
+评剧
+豫剧
+粤剧
+越调
+皮影戏
+河南曲剧
+河北梆子
+晋剧
+高腔
+蒲剧
+上党梆子
+雁剧
+秦腔
+二人台
+吉剧
+龙江剧
+山东梆子
+吕剧
+淮剧
+沪剧
+滑稽戏
+闽剧
+莆仙戏
+梨园戏
+高甲戏
+梆子腔
+赣剧
+采茶戏
+汉剧
+湘剧
+祁剧
+婺剧
+绍剧
+徽剧
+潮剧
+桂剧
+彩调
+壮剧
+川剧
+黔剧
+滇剧
+傣剧
+藏剧
+湖南花鼓戏
+凤阳花鼓戏`
 
-	keywords := []string{"豫剧", "京剧", "秦腔",
-		"曲剧", "晋剧", "评剧", "越剧", "黄梅戏",
-	}
+	keywords := strings.Split(kinds, "\n")
 
 	//数据清洗合并
-	merge_db(keywords)
-	return
+	//merge_db(keywords)
+	//return
 	v := make(chan bool, len(keywords))
 
 	//控制后续启动之后的并发量
@@ -58,7 +106,7 @@ loop:
 		}
 	}
 	log.Println("爬取：", keywords, "完成")
-
+	merge_db(keywords)
 	bdb.GlobalDB().Close()
 }
 

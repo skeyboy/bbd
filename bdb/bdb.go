@@ -130,6 +130,7 @@ create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIM
 	var topic_videos = `CREATE TABLE  IF NOT EXISTS  topic_videos (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   topic_id varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '专辑id',
+  cid bigint(20) NOT NULL DEFAULT 0,
   img varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '视频封面',
   av varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '视频在B站的标识',
   p varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '1' COMMENT '在专辑里面的页码',
@@ -137,7 +138,7 @@ create_date datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIM
   category_id int(10) unsigned NOT NULL DEFAULT '1' COMMENT '视频的分类',
   description varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '视频描述',
   view_number int(10) unsigned NOT NULL DEFAULT '1' COMMENT '观看次数',
-  status tinyint(3) unsigned NOT NULL DEFAULT '0' COMMENT '状态1可用，0禁用',
+  status tinyint(3) unsigned NOT NULL DEFAULT '2' COMMENT '状态1可用，0禁用，2新抓取',
   created_at timestamp NULL DEFAULT NULL,
   updated_at timestamp NULL DEFAULT NULL,
   PRIMARY KEY (id),

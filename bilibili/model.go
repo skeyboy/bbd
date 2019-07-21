@@ -78,6 +78,7 @@ type AlbumInfo struct {
 	OriginTitle string      `json:"originTitle"`
 	Pages       []AlbumPage `json:"pages"`
 	Owner       AlbumOwner  `json:"owner"`
+	Cid         int         `json:"cid"`
 }
 type AlbumOwner struct {
 	Mid  int64  `json:"mid"`
@@ -87,6 +88,7 @@ type AlbumOwner struct {
 type AlbumPage struct {
 	PageNum int    `json:"page"`
 	Part    string `json:"part"`
+	Cid     int    `json:"cid"`
 }
 
 func (v *Video) aIdString() string {
