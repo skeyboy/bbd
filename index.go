@@ -11,60 +11,109 @@ import (
 )
 
 func main() {
-	kinds := `昆曲
-京剧
-越剧
-黄梅戏
+	kinds := `越剧
 评剧
-豫剧
-粤剧
-越调
-皮影戏
 河南曲剧
-河北梆子
-晋剧
-高腔
-蒲剧
-上党梆子
-雁剧
-秦腔
-二人台
-吉剧
+皮影戏
 龙江剧
-山东梆子
-吕剧
-淮剧
-沪剧
-滑稽戏
-闽剧
 莆仙戏
-梨园戏
-高甲戏
-梆子腔
-赣剧
-采茶戏
-汉剧
-湘剧
-祁剧
-婺剧
-绍剧
-徽剧
-潮剧
-桂剧
-彩调
-壮剧
-川剧
+越调
 黔剧
+昆曲
 滇剧
-傣剧
-藏剧
+闽剧
+蒲剧
+赣剧
+桂剧
+潮剧
+上党梆子
+淮剧
 湖南花鼓戏
-凤阳花鼓戏`
-
+秦腔
+吉剧
+彩调
+绍剧
+滑稽戏
+高甲戏
+藏剧
+高腔
+傣剧
+婺剧
+梨园戏
+河北梆子
+吕剧
+梆子腔
+采茶戏
+沪剧
+山东梆子
+京剧
+黄梅戏
+湘剧
+汉剧
+凤阳花鼓戏
+雁剧
+豫剧
+二人台
+粤剧
+徽剧
+川剧
+壮剧
+祁剧
+晋剧`
+	kids_id := `1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49`
 	keywords := strings.Split(kinds, "\n")
+	keywords_id := strings.Split(kids_id, "\n")
 
 	//数据清洗合并
-	merge_db(keywords)
+	merge_db(keywords, keywords_id)
 	return
 	v := make(chan bool, len(keywords))
 
@@ -106,7 +155,7 @@ loop:
 		}
 	}
 	log.Println("爬取：", keywords, "完成")
-	merge_db(keywords)
+	merge_db(keywords, keywords_id)
 	bdb.GlobalDB().Close()
 }
 
@@ -138,16 +187,17 @@ func clean_before_merge() {
 		}
 	}
 }
-func merge_db(keywords []string) {
+func merge_db(keywords []string, keywords_id []string) {
 	//清洗数据，然后进行合并
 	clean_before_merge()
 
 	var finished = 0
 	merges := make(chan string, len(keywords))
 
-	for _, keyword := range keywords {
+	for index, keyword := range keywords {
 		keyword := keyword
-		go create_keyword_if_not_exists(keyword, merges)
+		id := keywords_id[index]
+		go create_keyword_if_not_exists(keyword, merges, id)
 	}
 
 merge:
@@ -301,9 +351,9 @@ func merge_topic(keyword string, keyid int) {
 	})
 
 }
-func create_keyword_if_not_exists(keyword string, channel chan string) {
-	stmt, _ := bdb.GlobalDB().Prepare("insert into  categories(category_name) value (?)")
-	stmt.Exec(keyword)
+func create_keyword_if_not_exists(keyword string, channel chan string, catg_id string) {
+	stmt, _ := bdb.GlobalDB().Prepare("insert into  categories(category_name,id) value (?,?)")
+	stmt.Exec(keyword, catg_id)
 	r := bdb.GlobalDB().QueryRow("select c.id from categories c where c.category_name=?", keyword)
 	var keywordId = 0
 	r.Scan(&keywordId)
